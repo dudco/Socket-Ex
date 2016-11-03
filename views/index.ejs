@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+
+      #nav {
+         list-style-type: none;
+         margin: 0;
+         padding: 0;
+         width: 20%;
+         background-color: #f1f1f1;
+         height: 50%; /* Full height */
+         position: fixed; /* Make it stick, even on scroll */
+         overflow: auto; /* Enable scrolling if the sidenav has too much content */
+         text-align: center;
+         border: 1px solid #555;
+      }
+      #nav li{
+        border-bottom: 1px solid #555
+      }
+      #nav li:active{
+        background-color: #4CAF50;
+      }
+
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages li { padding: 5px 10px 5px 10px; background-color: #eee}
+      /*#messages li:nth-child(odd) { background: #eee; }*/
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+    <!--socket-->
+    <script>
+      $(window).load(function(){
+        var socket = io();
+        var user_id = '<%=user.id %>';
+        var user_name = '<%=user.name %>';
+        console.log('user : ',user_name);
+
+        //add User
+        socket.emit('addUser',{
+          id : user_id,
+          name : user_name
+        })
+        socket.emit('change room', 'main')
+        //send message
+	      $('form').submit( function() {
+	        var msg = $('#m').val();
+	        console.log(msg);
+	        socket.emit('chat message', {
+            user : user_name,
+            msg : $('#m').val()
+          });
+	        $('#m').val('');
+	        return false;
+	      });
+
+        //Join User
+        socket.on('joinUser', (data) => {
+          console.log("join user : ",data);
+          $('#messages').append($('<li>').text("Joined User " + data));
+        });
+
+        //get message
+	      socket.on('chat message', (data) => {
+          console.log("client data : " + data);
+          $('#messages').append($('<li>').text(data.name +" : "+data.msg));
+	      });
+
+        //get my message
+        socket.on('my message', (data) => {
+          $('#messages').append($('<li style="margin-left:80%">').text(data));
+        });
+
+        //get user state
+        socket.on('user state', (users) => {
+          $('#nav').empty();
+          $('#nav').append($('<li><h1>User List</h1></li>'));
+          for(user of users){
+            console.log(user);
+            if(user.id == user_id) continue;
+            $('#nav').append($('<li>'+ user.name +'</li>'));
+          }
+        });
+
+        $('#nav').on('click', function(view) {
+          console.log(view.target.innerText);
+          if(view.target.innerText == 'User List'){
+              socket.emit('change room', 'main')
+              $('#messages').empty();
+          }else{
+            $.post("http://localhost:3000/chat",
+                    {
+                      a : user_name,
+                      b : view.target.innerText
+                    },function(data, status){
+                        // alert(data)
+                        $('#messages').empty();
+                        $('#messages').append($('<li>').text("Now token : "+data));
+                        $('#messages').append($('<li>').text("My Name : "+user_name));
+                         socket.emit('change room', data)
+                    });
+          }
+        });
+
+        socket.on('loading message', (data) => {
+          console.log(data);
+          for(des of data.des){
+            if(des.indexOf(user_name)){
+              $('#messages').append($('<li>').text(des));
+            }else{
+              $('#messages').append($('<li style="margin-left:80%">').text(des));
+            }
+          }
+        })
+	    });
+    </script>
+  </head>
+  <body>
+    <ul id="nav"></ul>
+    <ul id="messages" style="margin-left:20%;padding:1px 16px;height:1000px;"></ul>
+    <form action="">
+      <input id="m" autocomplete="off" /><button>Send</button>
+    </form>
+  </body>
+</html>
